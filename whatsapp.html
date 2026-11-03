@@ -1,0 +1,1146 @@
+<!doctype html>
+<html lang="es-PE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#06353B">
+<title>Simulador de WhatsApp | StetikGo</title>
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   Simulador de WhatsApp: demo de StetikGo (asistente virtual).
+   Autocontenido: HTML + CSS + JS vanilla. Sin frameworks ni CDN de scripts.
+   Molde: demo-greenhouserealty/site/whatsapp.html.
+
+   Perspectiva: esta pantalla es el TELEFONO DE LA CLIENTA conversando con StetikGo.
+     dir:'in'  = la clienta escribe              -> burbuja VERDE a la derecha
+     dir:'out' = la asistente (IA) o el sistema   -> burbuja BLANCA a la izquierda
+     dir:'sis' = nota de la demo (no es un mensaje de WhatsApp)
+   Lo que agrega el SIMULADOR (local, nunca lo manda el chat): la lamina de paquetes,
+   la miniatura de la constancia, la plantilla de campana, la baja de promos, la
+   "validacion del equipo" y los mensajes automaticos del despues.
+
+   Backend (mismo contrato que las demas demos de chat sin RAG):
+     POST {BASE}/stetikgo-demo-agent
+       { message, sessionId, channel:'web', origin }  ->  { output }
+   Sesion nueva por escenario: stetikgodemo_<rand>. Jamas prefijos wa_/ig_/msg_/fb_.
+
+   Pruebas sin gastar IA:  ?mock=1  responde con un guion local (sin llamar al chat).
+   ========================================================================== */
+:root{
+  /* ===== MARCA (discovery/MARCA.md + adendum del orquestador). Cambiar SOLO aqui. ===== */
+  --marca:#0090A8; --marca-hi:#50B8C0; --acento:#ECE3D2; --acento-hi:#F7F1E5;
+  --cream:#ECE3D2; --taupe:#928272;
+  --fondo:#06353B; --fondo2:#0A444B; --fondo3:#0F5760; --fondo-hondo:#04282D;
+  --tinta:#F2FAFA; --mute:#A9D4D7; --mute-2:#7FB3B8;
+  --line:rgba(236,227,210,.42); --line-soft:rgba(242,250,250,.14);
+  /* colores de la interfaz de WhatsApp (no son de la marca) */
+  --wa-header:#075e54; --wa-fondo:#e6e1d8; --wa-out:#d9fdd3; --wa-in:#ffffff;
+  --wa-meta:#667781; --wa-tick:#53bdeb; --wa-ink:#111b21; --wa-link:#027eb5;
+  --head:'Fraunces',Georgia,'Times New Roman',serif;
+  --sans:'DM Sans',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;color-scheme:dark}
+body{margin:0;background:var(--fondo);color:var(--tinta);font-family:var(--sans);font-size:16px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;min-height:100dvh;display:flex;flex-direction:column}
+img{max-width:100%;height:auto;display:block}
+p,h1,h2,h3,h4,ol,ul{margin:0}
+ol,ul{padding:0;list-style:none}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+[hidden]{display:none !important}
+a{color:var(--acento-hi)}
+:focus-visible{outline:3px solid var(--acento-hi);outline-offset:2px;border-radius:8px}
+
+/* ---------- franja de demo ---------- */
+.aviso{background:var(--fondo-hondo);color:var(--mute);padding:7px 16px;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;text-align:center;border-bottom:1px solid var(--line-soft)}
+.aviso b{color:var(--acento);font-weight:800}
+.aviso .corto{display:none}
+
+/* ---------- barra superior ---------- */
+.top{background:var(--fondo);border-bottom:1px solid var(--line-soft);flex:none}
+.top-in{max-width:1180px;margin:0 auto;padding:8px 16px;display:flex;align-items:center;gap:12px}
+.top-in .logo{width:44px;height:44px;border-radius:50%;flex:none;object-fit:cover}
+.top-in .quien{min-width:0}
+.top-in .quien b{display:block;font-family:var(--head);font-weight:600;font-size:17px;letter-spacing:.01em;color:var(--tinta);line-height:1.2}
+.top-in .quien small{display:block;font-size:12.5px;color:var(--mute);font-weight:500}
+.top-in .quien .corto{display:none}
+.top-sp{flex:1}
+.lnk{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 16px;border-radius:999px;border:1.5px solid var(--line);
+  background:transparent;color:var(--tinta);font-weight:700;font-size:14px;text-decoration:none;white-space:nowrap;cursor:pointer}
+.lnk:hover{border-color:var(--acento);color:var(--acento-hi)}
+.lnk.solid{background:var(--acento);color:var(--fondo);border-color:transparent}
+.lnk.solid:hover{background:var(--acento-hi);color:var(--fondo)}
+.lnk.volver{border-color:transparent;color:var(--mute);padding:0 10px}
+.lnk.volver:hover{color:var(--acento-hi)}
+
+/* ---------- selector de escenario ---------- */
+.selector{background:var(--fondo2);border-bottom:1px solid var(--line-soft);flex:none}
+.sel-in{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap}
+.sel-lab{font-weight:700;font-size:14px;color:var(--mute);letter-spacing:.02em}
+.chips{display:flex;gap:8px;flex-wrap:wrap;min-width:0}
+.chip{border:1.5px solid var(--acento);background:transparent;cursor:pointer;min-height:44px;padding:0 14px 0 8px;border-radius:999px;font-weight:600;font-size:13.5px;line-height:1.15;color:var(--acento-hi);text-align:left;display:inline-flex;align-items:center;gap:8px}
+.chip .l{width:24px;height:24px;border-radius:50%;background:var(--acento);color:var(--fondo);font-family:var(--head);font-weight:700;font-size:13px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.chip[aria-pressed="true"]{background:var(--acento);color:var(--fondo)}
+.chip[aria-pressed="true"] .l{background:var(--fondo);color:var(--acento-hi)}
+.chip:not([aria-pressed="true"]):hover{background:rgba(236,227,210,.14)}
+.sel-info{font-size:13.5px;font-weight:500;color:var(--mute);min-width:0;flex:1 1 100%}
+
+/* ---------- layout ---------- */
+.wrap{flex:1;width:100%;max-width:1180px;margin:0 auto;padding:18px 16px;display:grid;grid-template-columns:minmax(0,1fr);gap:22px;align-content:start;min-height:0}
+@media (min-width:900px){
+  .wrap{grid-template-columns:360px minmax(0,1fr);align-items:start}
+  .lateral{position:sticky;top:16px}
+}
+
+/* ---------- panel lateral ---------- */
+.lateral{background:var(--fondo2);border:1px solid var(--line-soft);border-radius:18px;padding:20px 20px 22px}
+.lateral h2{font-family:var(--head);font-weight:600;font-size:1.5rem;letter-spacing:-.005em;line-height:1.15}
+.lateral .sub{margin-top:8px;font-size:14.5px;color:var(--mute);line-height:1.55}
+.grp{margin-top:18px;padding-top:16px;border-top:1px solid var(--line-soft)}
+.grp h3{font-family:var(--sans);font-weight:700;font-size:14.5px;color:var(--tinta)}
+.grp .hint{margin-top:8px;font-size:13px;color:var(--mute-2);line-height:1.45}
+.rapidos{margin-top:10px;display:flex;flex-direction:column;gap:7px}
+.rapido{padding:10px 13px;border-radius:12px;border:1px solid var(--line-soft);background:var(--fondo3);font-size:14.5px;font-weight:600;color:var(--tinta);cursor:pointer;text-align:left;line-height:1.35;min-height:44px}
+.rapido:hover{border-color:var(--acento);color:var(--acento-hi)}
+.fld{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+.fld input{flex:1 1 150px;padding:10px 12px;border:1px solid var(--line-soft);border-radius:12px;background:var(--fondo);color:var(--tinta);font-size:13px;-webkit-appearance:none;appearance:none;min-height:44px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.btn-s{min-height:44px;padding:0 20px;border:1.5px solid var(--acento);border-radius:999px;background:transparent;color:var(--acento-hi);font-weight:700;font-size:14.5px;cursor:pointer;line-height:1}
+.btn-s:hover{background:var(--acento);color:var(--fondo)}
+.reparto{margin:12px 0 0;display:grid;gap:11px}
+.reparto li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;align-items:start;font-size:14.5px;line-height:1.4}
+.reparto .n{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--acento);color:var(--acento-hi);font-family:var(--head);font-weight:600;font-size:.95rem;display:flex;align-items:center;justify-content:center;line-height:1}
+.reparto b{font-weight:700}
+.estado-crm{margin-top:12px;border:1px dashed var(--line);border-radius:14px;padding:11px 14px;font-size:14px;color:var(--mute);line-height:1.45}
+.estado-crm b{display:block;color:var(--tinta);font-weight:700;margin-bottom:2px}
+.estado-crm.hecho{border:1px solid var(--acento);background:rgba(236,227,210,.09);color:var(--tinta)}
+.estado-crm.hecho b{color:var(--acento-hi)}
+.turnos{margin-top:12px;font-size:13px;color:var(--mute);display:flex;justify-content:space-between;gap:8px}
+.turnos b{color:var(--tinta)}
+.lat-links{margin-top:16px;display:flex;flex-direction:column;gap:2px;font-size:14.5px;font-weight:700}
+.lat-links a{text-decoration:none;display:flex;align-items:center;min-height:44px}
+.lat-links a:hover{text-decoration:underline}
+
+/* ---------- telefono ---------- */
+.fono{background:#031f23;border-radius:28px;padding:9px;border:1px solid var(--line-soft);box-shadow:0 30px 70px -30px rgba(0,0,0,.95),0 0 0 1px rgba(236,227,210,.07);
+  display:flex;flex-direction:column;overflow:hidden;height:min(800px,calc(100dvh - 300px));min-height:580px;max-width:430px;width:100%;margin:0 auto}
+.pantalla{flex:1;display:flex;flex-direction:column;background:var(--wa-fondo);border-radius:20px;overflow:hidden;min-height:0;color:var(--wa-ink)}
+.status{background:var(--wa-header);color:#fff;display:flex;align-items:center;gap:8px;padding:7px 16px 5px;font-size:12px;font-weight:700}
+.status .sp{flex:1}
+.chat-hd{background:var(--wa-header);color:#fff;display:flex;align-items:center;gap:11px;padding:8px 12px 10px}
+.chat-hd .back{opacity:.9;flex:none}
+.chat-hd .av{position:relative;width:42px;height:42px;border-radius:50%;flex:none;background:#ECE3D2;color:#928272;font-family:var(--head);font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.chat-hd .av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.chat-hd .quien{flex:1;min-width:0}
+.chat-hd .quien b{display:flex;align-items:center;gap:6px;font-size:15.5px;font-weight:700;line-height:1.2;white-space:nowrap}
+.chat-hd .quien small{display:block;font-size:12.5px;color:rgba(255,255,255,.84);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-hd .ico{display:flex;gap:16px;opacity:.92;flex:none;padding-right:2px}
+
+.hilo{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:12px 8px 14px;min-height:0;background-color:var(--wa-fondo);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23d3cdc1' stroke-width='1.3' stroke-linecap='round' opacity='.7'%3E%3Ccircle cx='22' cy='24' r='7'/%3E%3Cpath d='M70 18c6 0 10 4 10 9s-5 9-10 9-10-4-10-9 4-9 10-9z'/%3E%3Cpath d='M26 78l8 8 8-8M92 76v14M85 83h14'/%3E%3Ccircle cx='96' cy='34' r='2'/%3E%3Ccircle cx='54' cy='96' r='2'/%3E%3C/g%3E%3C/svg%3E")}
+.demo-nota{display:block;max-width:92%;margin:2px auto 10px;background:#fff8c9;color:#54656f;border-radius:8px;padding:8px 11px;font-size:12.5px;line-height:1.45;text-align:center;font-weight:600;box-shadow:0 1px 1px rgba(11,20,26,.13)}
+.demo-nota.mockn{background:#fde7d6;color:#7a3a0b}
+.dia{display:block;width:fit-content;margin:8px auto 8px;background:#fff;color:var(--wa-meta);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;box-shadow:0 1px 1px rgba(11,20,26,.13)}
+.sis{display:block;width:fit-content;max-width:90%;margin:8px auto 10px;background:#e7e2db;color:#3b4a54;border-radius:8px;padding:8px 12px;font-size:13px;line-height:1.45;text-align:center;box-shadow:0 1px 1px rgba(11,20,26,.1)}
+.sis.corto-tiempo{background:#1f2c34;color:#e9edef;border-radius:999px;padding:6px 14px;font-size:12.5px;font-weight:700}
+.sis.err{background:#fdecea;color:#7a1d17}
+.sis button{display:block;margin:8px auto 0;min-height:44px;padding:0 20px;border-radius:999px;border:2px solid #7a1d17;background:#fff;color:#7a1d17;font-weight:700;font-size:14px;cursor:pointer}
+.sis button:hover{background:#7a1d17;color:#fff}
+.sis.accion{background:#fff;border:1.5px solid var(--marca);color:#1b3f43;max-width:88%}
+.sis.accion b{display:block;font-weight:700}
+.sis.accion button{border-color:var(--marca);color:#00687a;background:#fff}
+.sis.accion button:hover{background:var(--marca);color:#fff}
+.sis.accion.ok{border-color:#25a05a}
+.sis.accion.ok button{border-color:#1c8049;color:#14673a}
+.sis.accion.ok button:hover{background:#1c8049;color:#fff}
+
+.msg{width:fit-content;max-width:84%;margin:0 6px 8px;padding:6px 9px 7px;border-radius:8px;position:relative;box-shadow:0 1px 1px rgba(11,20,26,.13);
+  font-size:15.5px;line-height:1.42;color:var(--wa-ink);overflow-wrap:anywhere}
+.msg.nuevo{animation:aparece .18s ease-out}
+@keyframes aparece{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.msg.del-neg{background:var(--wa-in);margin-right:auto;border-top-left-radius:0}
+.msg.del-cliente{background:var(--wa-out);margin-left:auto;border-top-right-radius:0}
+.msg .ln{display:block;white-space:pre-wrap}
+.msg .ln.sep{height:.85em}
+.msg .ln.li{padding-left:1.15em;text-indent:-1.15em}
+.msg .txt a{color:var(--wa-link);text-decoration:underline;overflow-wrap:anywhere}
+.msg strong{font-weight:700}
+.msg .pie{float:right;margin:6px 0 -2px 10px;display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--wa-meta);line-height:1;user-select:none;white-space:nowrap}
+.msg .pie .ticks{color:var(--wa-tick)}
+.msg .pie .ticks.gris{color:#8696a0}
+.msg::after{content:"";display:block;clear:both}
+.msg.del-neg::before,.msg.del-cliente::before{content:"";position:absolute;top:0;width:9px;height:13px}
+.msg.del-neg::before{left:-8px;background:var(--wa-in);clip-path:polygon(100% 0,0 0,100% 100%)}
+.msg.del-cliente::before{right:-8px;background:var(--wa-out);clip-path:polygon(0 0,100% 0,0 100%)}
+/* CSS defensivo: emojis convertidos en <img> por librerias no pueden crecer */
+.msg img.emoji,.msg .txt img{max-width:1.2em !important;max-height:1.2em !important;display:inline-block !important;vertical-align:text-bottom !important}
+
+/* marca "Automatico" sobre los mensajes que manda el sistema */
+.msg.sistema{padding-top:5px}
+.insignia{display:inline-block;margin:0 0 4px;padding:2px 8px;border-radius:999px;background:#e0f3f5;color:#00687a;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.tag-auto{display:block;margin:5px 0 0;font-size:11.5px;color:var(--wa-meta);font-style:italic;line-height:1.35}
+.falso{display:inline-block;margin-top:2px;color:var(--wa-link);text-decoration:underline;text-decoration-style:dotted;cursor:default}
+
+/* anuncio que trae a la clienta */
+.ad{display:block;border-radius:6px;overflow:hidden;background:#0A444B;color:#fff;margin:0 0 5px;border:1px solid rgba(11,20,26,.12)}
+.ad img{width:100%;height:auto;aspect-ratio:2/1;object-fit:cover;object-position:50% 14%;background:#E0F2F3}
+.ad .ad-t{display:block;padding:7px 10px 8px;font-size:12px;line-height:1.35}
+.ad .ad-t b{display:block;font-size:13.5px;font-weight:700}
+.ad .ad-t span{color:rgba(255,255,255,.78)}
+
+/* plantilla de campana + botones */
+.msg.tpl{padding:4px 4px 7px;width:min(300px,86%);max-width:86%}
+.tpl-hd{display:block;border-radius:6px;background:linear-gradient(135deg,#006F82,#0090A8 58%,#50B8C0);color:#fff;padding:20px 12px 16px;margin-bottom:5px}
+.tpl-hd .t1{display:block;font-family:var(--head);font-weight:600;font-size:21px;line-height:1.1;letter-spacing:-.01em}
+.tpl-hd .t2{display:block;margin-top:5px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;opacity:.9}
+.msg.tpl .txt{display:block;padding:4px 6px 0}
+.msg.tpl .tag-auto{margin:6px 6px 0}
+.msg.tpl .pie{margin-right:4px}
+.tpl-btns{display:grid;gap:3px;margin:-3px 6px 8px;width:min(300px,86%)}
+.tpl-btns button{min-height:44px;border:0;border-radius:8px;background:#fff;color:var(--wa-link);font-weight:600;font-size:15px;cursor:pointer;box-shadow:0 1px 1px rgba(11,20,26,.13);display:flex;align-items:center;justify-content:center;gap:7px}
+.tpl-btns button:hover:not(:disabled){background:#f1f8fa}
+.tpl-btns button:disabled{opacity:.55;cursor:default}
+
+/* lamina de paquetes (la agrega el simulador, como hace el equipo hoy) */
+.msg.lamina{padding:3px 3px 6px;width:min(268px,78%)}
+.msg.lamina img{width:100%;height:auto;aspect-ratio:937/1172;border-radius:6px;object-fit:cover;background:#e0f2f3}
+.msg.lamina .pie{margin:3px 7px -1px 8px}
+.lamina-nota{display:block;width:min(268px,78%);margin:-4px 6px 10px;font-size:11.5px;line-height:1.35;color:#54656f;font-style:italic}
+
+/* constancia: miniatura gris sin imagen real */
+.const{display:flex;flex-direction:column;gap:5px;width:132px;margin:0 0 6px;padding:11px 12px 10px;border-radius:6px;background:#dfe3e5;border:1px solid #cdd3d6}
+.const i{display:block;height:6px;border-radius:3px;background:#c3c9cc}
+.const i.s{width:62%}
+.const i.g{height:12px;width:48%;background:#b6bdc1;margin-bottom:3px}
+.const em{display:block;margin-top:3px;font-style:normal;font-size:10.5px;font-weight:700;color:#6b7a84;letter-spacing:.04em;text-transform:uppercase}
+
+.typing{display:flex;gap:4px;align-items:center;width:fit-content;margin:0 6px 8px;padding:11px 13px;background:var(--wa-in);border-radius:8px;border-top-left-radius:0;box-shadow:0 1px 1px rgba(11,20,26,.13)}
+.typing i{width:7px;height:7px;border-radius:50%;background:#9aa6ab;animation:pulso 1.1s infinite}
+.typing i:nth-child(2){animation-delay:.16s}.typing i:nth-child(3){animation-delay:.32s}
+@keyframes pulso{0%,60%,100%{opacity:.35;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+
+/* franja de acciones sobre el input: constancia + (movil) respuestas rapidas */
+.franja{display:flex;gap:7px;padding:8px 8px 0;background:#f0f2f5;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.franja::-webkit-scrollbar{display:none}
+.franja .rapido{white-space:nowrap;padding:8px 14px;border-radius:999px;font-size:14px;flex:none;background:#fff;color:var(--wa-ink);border:1.5px solid #d6dbdf;min-height:44px}
+.franja .rapido:hover{border-color:var(--marca);color:var(--wa-ink)}
+.franja .rapido-m{display:none}
+.btn-const{display:inline-flex;align-items:center;gap:7px;flex:none;min-height:44px;padding:0 15px 0 12px;border-radius:999px;border:1.5px solid var(--marca);background:#fff;color:#00687a;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap}
+.btn-const:hover:not(:disabled){background:var(--marca);color:#fff}
+.btn-const:disabled{opacity:.5;cursor:default}
+.btn-const.sugerido{background:var(--marca);color:#fff;box-shadow:0 0 0 0 rgba(0,144,168,.55);animation:sugiere 1.8s infinite}
+@keyframes sugiere{0%{box-shadow:0 0 0 0 rgba(0,144,168,.5)}70%{box-shadow:0 0 0 9px rgba(0,144,168,0)}100%{box-shadow:0 0 0 0 rgba(0,144,168,0)}}
+
+.escribir{display:flex;align-items:flex-end;gap:7px;padding:7px 8px 9px;background:#f0f2f5}
+.caja-txt{flex:1;display:flex;align-items:flex-end;gap:8px;background:#fff;border-radius:22px;padding:10px 13px;min-width:0}
+.caja-txt svg{flex:none;color:#8696a0;margin-bottom:2px}
+.caja-txt textarea{flex:1;border:0;outline:0;resize:none;overflow:hidden;max-height:100px;font-size:16px;line-height:1.4;background:transparent;color:var(--wa-ink);padding:0;min-width:0}
+.caja-txt textarea::placeholder{color:#6b7a84}
+.enviar{flex:none;width:46px;height:46px;border-radius:50%;border:0;background:#128c7e;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.enviar:hover{background:#0e7568}
+.enviar:disabled{opacity:.5;cursor:progress}
+
+footer{border-top:1px solid var(--line-soft);background:var(--fondo-hondo);flex:none}
+.foot{max-width:1180px;margin:0 auto;padding:12px 16px;display:flex;gap:6px 18px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--mute-2)}
+.foot a{color:var(--mute);text-decoration:none;font-weight:700}
+.foot a:hover{color:var(--acento-hi);text-decoration:underline}
+.foot .sp{flex:1}
+
+/* ---------- movil: el telefono ocupa la pantalla y el panel va debajo ---------- */
+@media (max-width:899px){
+  .aviso{padding:5px 10px;font-size:10px;letter-spacing:.05em}
+  .aviso .largo{display:none}
+  .aviso .corto{display:inline}
+  .top-in{padding:4px 12px;gap:6px}
+  .top-in .logo{display:none}
+  .top-in .quien small{display:none}
+  .top-in .quien b{font-size:15px}
+  .top-in .quien .largo{display:none}
+  .top-in .quien .corto{display:inline}
+  .lnk{min-height:44px;padding:0 12px;font-size:13px}
+  .lnk.volver{display:none}
+  .sel-in{padding:6px 12px;gap:6px;flex-wrap:nowrap}
+  .sel-lab{display:none}
+  .chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 -12px;padding:0 12px;flex:1}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{white-space:nowrap;flex:none;padding:0 13px 0 8px;font-size:13px}
+  .sel-info{display:none}
+  .wrap{padding:0 0 18px;display:flex;flex-direction:column;gap:18px}
+  .fono{height:calc(100dvh - 150px);min-height:470px;max-width:none;border-radius:0;padding:0;box-shadow:none;border:0;background:transparent}
+  .pantalla{border-radius:0}
+  .status{display:none}
+  .franja .rapido-m{display:inline-flex;align-items:center}
+  .msg{max-width:88%}
+  .lateral{order:2;margin:0 12px}
+  .foot{padding:10px 12px;font-size:12px}
+  .foot .sp,.foot .largo{display:none}
+}
+@media (min-width:900px){ .foot .corto{display:none} }
+@media (prefers-reduced-motion:reduce){ *{animation:none !important} }
+</style>
+</head>
+<body>
+
+<div class="aviso"><b>Demo</b> <span class="largo">&middot; simulaci&oacute;n: no escribas DNI ni datos reales &middot; no es el WhatsApp real y no se env&iacute;a nada a nadie &middot; hecha por IJV Agency</span><span class="corto">&middot; simulaci&oacute;n, no es el WhatsApp real</span></div>
+
+<header class="top">
+  <div class="top-in">
+    <img class="logo" src="assets/logo.png" width="44" height="44" alt="" onerror="this.style.display='none'">
+    <div class="quien"><b><span class="largo">Simulador de WhatsApp</span><span class="corto">WhatsApp (demo)</span></b><small>Demo de la asistente virtual de StetikGo</small></div>
+    <div class="top-sp"></div>
+    <a class="lnk volver" href="./">&larr; Volver al sitio</a>
+    <a class="lnk" href="panel.html?vista=clientas">Ver el CRM</a>
+    <button class="lnk solid" id="btn-reiniciar-top" type="button">Reiniciar chat</button>
+  </div>
+</header>
+
+<div class="selector">
+  <div class="sel-in">
+    <span class="sel-lab">Simular:</span>
+    <div class="chips" role="group" aria-label="Escenario">
+      <button class="chip" type="button" data-esc="anuncio" aria-pressed="false"><span class="l">1</span>Llega por un anuncio de Head Spa</button>
+      <button class="chip" type="button" data-esc="otro" aria-pressed="false"><span class="l">2</span>Entra por una campa&ntilde;a y pregunta otra cosa</button>
+      <button class="chip" type="button" data-esc="campana" aria-pressed="false"><span class="l">3</span>Responde a &laquo;Ya abrimos en San Isidro&raquo;</button>
+      <button class="chip" type="button" data-esc="hoy" aria-pressed="false"><span class="l">4</span>Clienta que quiere ir hoy</button>
+    </div>
+    <p class="sel-info" id="sel-info"></p>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ============ panel lateral (en movil va debajo del telefono) ============ -->
+  <aside class="lateral">
+    <h2>As&iacute; lo ve quien escribe a StetikGo</h2>
+    <p class="sub">T&uacute; eres la clienta. Elige un escenario: el bot&oacute;n escribe el primer mensaje por ti y despu&eacute;s sigues la conversaci&oacute;n t&uacute; misma.</p>
+
+    <div class="grp">
+      <h3>Qu&eacute; est&aacute;s viendo</h3>
+      <ol class="reparto">
+        <li><span class="n">1</span><span><b>La asistente virtual (IA)</b> responde al instante, a cualquier hora, con lo que le ense&ntilde;&oacute; StetikGo, y pregunta una sola cosa por mensaje.</span></li>
+        <li><span class="n">2</span><span><b>Para reservar</b> pide un abono de S/&nbsp;10 que se descuenta del total; el equipo lo valida con 1 clic.</span></li>
+        <li><span class="n">3</span><span><b>Cada conversaci&oacute;n queda en el CRM</b>, calificada Caliente, Tibio o Fr&iacute;o, con &laquo;Llamar hoy&raquo; si la cita se puede perder.</span></li>
+      </ol>
+      <div class="estado-crm" id="estado-crm"><b>En el CRM: sin reserva todav&iacute;a</b>La clienta aparece cuando deja sus datos para reservar.</div>
+      <div class="turnos"><span>Turnos de esta conversaci&oacute;n</span><b id="turnos">0 de 18</b></div>
+    </div>
+
+    <div class="lat-links">
+      <a href="panel.html?vista=campanas">Ver las campa&ntilde;as en el CRM &rarr;</a>
+      <a href="panel.html?vista=clientas">Ver las clientas en el CRM &rarr;</a>
+    </div>
+
+    <div class="grp">
+      <h3>Mensajes r&aacute;pidos (datos ficticios)</h3>
+      <div class="rapidos" id="rapidos-d"></div>
+      <p class="hint">Se escriben en la caja de texto; t&uacute; decides cu&aacute;ndo enviarlos.</p>
+    </div>
+
+    <div class="grp">
+      <h3>Conversaci&oacute;n</h3>
+      <div class="fld"><input type="text" id="in-sesion" class="mono" aria-label="Identificador de la conversaci&oacute;n" readonly></div>
+      <div class="fld"><button class="btn-s" id="btn-reiniciar" type="button">Reiniciar chat</button></div>
+      <p class="hint">Empieza un hilo limpio, con el mismo escenario (sin enviar nada).</p>
+    </div>
+
+    <div class="lat-links"><a href="./">&larr; Volver al sitio</a></div>
+  </aside>
+
+  <!-- ============ telefono ============ -->
+  <div class="fono">
+    <div class="pantalla">
+
+      <div class="status">
+        <span id="st-hora">--:--</span>
+        <span class="sp"></span>
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor" aria-hidden="true"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+        <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M1 5.2C3 3.1 5.4 2 8 2s5 1.1 7 3.2"/><path d="M3.6 7.7C4.9 6.4 6.4 5.7 8 5.7s3.1.7 4.4 2"/><path d="M6.3 10.2c.5-.5 1-.8 1.7-.8s1.2.3 1.7.8"/></svg>
+        <svg width="24" height="12" viewBox="0 0 24 12" aria-hidden="true"><rect x=".7" y=".7" width="19" height="10.6" rx="2.6" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".6"/><rect x="2.2" y="2.2" width="14.5" height="7.6" rx="1.5" fill="currentColor"/><path d="M21.4 4.2v3.6c1-.3 1.6-1 1.6-1.8s-.6-1.5-1.6-1.8z" fill="currentColor" opacity=".6"/></svg>
+      </div>
+
+      <div class="chat-hd">
+        <svg class="back" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+        <span class="av" aria-hidden="true">S<img id="hd-av" src="assets/logo.png" width="42" height="42" alt=""></span>
+        <div class="quien">
+          <b>StetikGo <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#25d366"/><path d="M7 12.5l3.2 3.2L17 8.8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></b>
+          <small id="hd-estado">cuenta de empresa</small>
+        </div>
+        <div class="ico">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.4c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z"/></svg>
+          <svg width="5" height="19" viewBox="0 0 5 19" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="2.5" r="2.1"/><circle cx="2.5" cy="9.5" r="2.1"/><circle cx="2.5" cy="16.5" r="2.1"/></svg>
+        </div>
+      </div>
+
+      <div class="hilo" id="hilo" role="log" aria-live="polite" aria-label="Conversaci&oacute;n de WhatsApp"></div>
+
+      <div class="franja" id="franja">
+        <button class="btn-const" id="btn-const" type="button"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.4 11.1l-9.2 9.2a5.5 5.5 0 01-7.8-7.8l9.2-9.2a3.7 3.7 0 015.2 5.2l-9.2 9.2a1.8 1.8 0 01-2.6-2.6l8.5-8.5"/></svg>Enviar constancia</button>
+        <span id="rapidos-m" style="display:contents"></span>
+      </div>
+
+      <form class="escribir" id="form">
+        <div class="caja-txt">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9.2"/><path d="M8.4 14.2c.9 1.2 2.1 1.8 3.6 1.8s2.7-.6 3.6-1.8" stroke-linecap="round"/><circle cx="9" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1.1" fill="currentColor" stroke="none"/></svg>
+          <textarea id="in-msg" rows="1" placeholder="Mensaje" autocomplete="off" aria-label="Mensaje"></textarea>
+        </div>
+        <button class="enviar" id="btn-enviar" type="submit" aria-label="Enviar mensaje">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.3 21.3l19.4-8.7c.9-.4.9-1.7 0-2.1L2.3 1.8c-.8-.4-1.6.3-1.4 1.1L3 10.3c.1.4.4.6.8.7l8.5 1-8.5 1c-.4 0-.7.3-.8.7L.9 20.2c-.2.8.6 1.5 1.4 1.1z"/></svg>
+        </button>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="foot">
+    <span><span class="corto">Demo de <b>IJV Agency</b></span><span class="largo">Simulador preparado por <b>IJV Agency</b> para StetikGo. Sitio de muestra, no es una web oficial.</span></span>
+    <span class="sp"></span>
+    <a href="politica-privacidad.html">Pol&iacute;tica de privacidad</a>
+    <a href="https://ijvagency.com/" target="_blank" rel="noopener">Powered by IJV</a>
+  </div>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ---------------- backend ---------------- */
+  var BASE_DEF = 'https://meta.ijvagency.com/webhook';
+  var qs = new URLSearchParams(location.search);
+  /* ?mock=1 -> guion local, NO llama al chat (para ensayar sin gastar IA) */
+  var MOCK = qs.get('mock') === '1';
+  /* El override ?api= solo se acepta sirviendo en local (pruebas contra un stub).
+     En produccion la pagina siempre habla con el webhook real. */
+  var esLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  var BASE = (esLocal && qs.get('api')) ? qs.get('api').replace(/\/$/,'') : BASE_DEF;
+  var EP_CHAT = BASE + '/stetikgo-demo-agent';
+
+  var TZ = 'America/Lima';
+  var TIMEOUT = 45000;      /* el agente con catalogo inline puede tardar */
+  var REINTENTOS = 1;       /* un reintento automatico; luego el boton Reintentar: nada de loops */
+  var MAX_TURNOS = 18;      /* el Security del chat corta en 20 por sesion: se frena antes */
+  var K = 'stetikgodemo:v1';/* sessionStorage: estable por pestana */
+
+  var IMG_LAMINA = 'assets/head-spa-paquetes.jpg';
+  var TXT_CONSTANCIA = 'Ya yapeé, aquí está la constancia 📎';
+  var TXT_BAJA = 'Listo, ya no recibirás promociones de StetikGo. Si cambias de idea, escríbenos cuando quieras.';
+  var TXT_PLANTILLA = 'Hola, ya estamos en San Isidro. Estrenamos local nuevo y nos encantaría recibirte. Reserva tu horario cuando quieras.';
+  var OTRO_SERVICIO = 'manicure';
+
+  /* ---------------- escenarios ----------------
+     Cada boton SOLO escribe y envia el primer mensaje literal; lo que responde la
+     asistente es de la asistente (o del guion local con ?mock=1). */
+  var ESCENARIOS = {
+    anuncio: {
+      primero: 'Hola, quisiera más información del Head Spa',
+      ad: { t:'Head Spa reclinable y con pedicure', s:'StetikGo · Anuncio de ejemplo (ilustrativo)' },
+      info: 'La clienta tocó un anuncio de Head Spa y WhatsApp abrió el chat. La asistente presenta los paquetes, ayuda a elegir y deja la reserva lista con el abono.',
+      nota: 'Demo: simulas a una clienta que vio el anuncio. Datos ficticios; no escribas DNI ni datos reales.',
+      rapidos: [
+        'Quiero el Head Spa VIP',
+        'Mi nombre es Camila Rojas Vega',
+        'Mañana a las 6 de la tarde',
+        'Mi celular es 999 000 123',
+        '¿Qué incluye el Premium?'
+      ]
+    },
+    otro: {
+      primero: 'Hola, ¿tienen ' + OTRO_SERVICIO + '? ¿Cuánto cuesta?',
+      ad: { t:'Head Spa reclinable y con pedicure', s:'StetikGo · Anuncio de ejemplo (ilustrativo)' },
+      info: 'Entró por el anuncio de Head Spa pero pregunta por otro servicio. La asistente lo resuelve en la misma conversación, sin rebotarla; si no tiene un precio confirmado, dice que lo confirma el equipo.',
+      nota: 'Demo: simulas a una clienta que llegó por una campaña y pregunta por otro servicio. Datos ficticios.',
+      rapidos: [
+        'Sí, quiero reservar',
+        'Mi nombre es Lucía Paredes Ríos',
+        'El sábado a las 11 de la mañana',
+        'Mi celular es 999 000 123',
+        '¿Y el Head Spa cuánto cuesta?'
+      ]
+    },
+    campana: {
+      primero: 'Reservar',
+      plantilla: true,
+      ad: null,
+      info: 'StetikGo le escribió con la campaña «Ya abrimos en San Isidro». La clienta toca «Reservar» y la asistente retoma desde ahí. Si toca «No recibir promos», el sistema la da de baja sin llamar al chat.',
+      nota: 'Demo: simulas a una clienta que recibió una campaña de StetikGo. Es el mismo módulo de Campañas del CRM.',
+      rapidos: [
+        'Quiero un Head Spa',
+        'Mi nombre es Daniela Quispe León',
+        'El viernes a las 6 de la tarde',
+        'Mi celular es 999 000 123'
+      ]
+    },
+    hoy: {
+      primero: '¿Tienen cupo para hoy en la tarde?',
+      ad: null,
+      info: 'Quiere ir hoy. La asistente no promete un cupo que no puede confirmar: deja la reserva en marcha y, en el CRM, la clienta cae como «Llamar hoy» para que el equipo la llame antes de que se pierda la cita.',
+      nota: 'Demo: simulas a una clienta que quiere ir hoy. Datos ficticios.',
+      rapidos: [
+        'Quiero un Head Spa',
+        'Mi nombre es Andrea Salas Mejía',
+        'Hoy a las 3 de la tarde',
+        'Mi celular es 999 000 123'
+      ]
+    }
+  };
+
+  /* ---------------- utilidades ---------------- */
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  /* Jamas wa_/ig_/msg_/fb_ ni eval_/smoke/qa-: el prefijo es propio de la demo */
+  function nuevaSesion(){ return 'stetikgodemo_' + Math.random().toString(16).slice(2,10) + Date.now().toString(36).slice(-4); }
+  function hora(v){
+    var d = (v instanceof Date) ? v : (v ? new Date(v) : new Date());
+    if(isNaN(d)) d = new Date();
+    var s;
+    try{
+      s = new Intl.DateTimeFormat('es-PE',{timeZone:TZ,hour:'numeric',minute:'2-digit',hour12:true}).format(d);
+    }catch(e){
+      var h=d.getHours(), m=('0'+d.getMinutes()).slice(-2), t=h<12?'a':'p';
+      h = h%12; if(h===0) h=12;
+      s = h+':'+m+' '+t+'. m.';
+    }
+    return s.replace(/[  ]/g,' ').replace(/\s*\b([APap])\.?\s*[Mm]\.?/, function(_,l){
+      return ' ' + l.toLowerCase() + '. m.';
+    });
+  }
+  function diaLargo(d){
+    try{ return new Intl.DateTimeFormat('es-PE',{timeZone:TZ,weekday:'long',day:'numeric',month:'long'}).format(d); }
+    catch(e){ return 'hoy'; }
+  }
+  function norm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+  function capitaliza(t){ t = String(t||'').trim(); return t.charAt(0).toUpperCase() + t.slice(1); }
+
+  /* ---------------- estado (sessionStorage, con respaldo en memoria) ---------------- */
+  function lee(){ try{ return JSON.parse(sessionStorage.getItem(K) || 'null'); }catch(e){ return null; } }
+  function guarda(){
+    try{
+      sessionStorage.setItem(K, JSON.stringify({ esc:st.esc, sesion:st.sesion, msgs:st.msgs.slice(-80), mock:st.mock, mockOn:MOCK,
+        validado:st.validado, despues:st.despues, baja:st.baja }));
+    }catch(e){}
+  }
+  var prev = lee();
+  var st = {
+    esc: (prev && ESCENARIOS[prev.esc]) ? prev.esc : 'anuncio',
+    sesion: '', msgs: [], mock: { paso:'inicio', datos:{}, fallos:0 },
+    validado:false, despues:false, baja:false,
+    enVuelo:false, esperando:false, lleno:false
+  };
+  /* si cambia ?mock=1 entre cargas, no se mezclan hilos reales con guion local */
+  if(prev && prev.sesion && Array.isArray(prev.msgs) && !!prev.mockOn === MOCK){
+    st.sesion = prev.sesion; st.msgs = prev.msgs; if(prev.mock) st.mock = prev.mock;
+    st.validado = !!prev.validado; st.despues = !!prev.despues; st.baja = !!prev.baja;
+  }else{
+    st.sesion = nuevaSesion();
+  }
+
+  /* ---------------- red ---------------- */
+  function post(url, body, ms){
+    var ctl = ('AbortController' in window) ? new AbortController() : null;
+    var to = setTimeout(function(){ if(ctl) ctl.abort(); }, ms||TIMEOUT);
+    return fetch(url,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body), signal:ctl?ctl.signal:undefined, cache:'no-store'
+    }).then(function(r){
+      clearTimeout(to);
+      return r.text().then(function(t){
+        var j=null; try{ j=t?JSON.parse(t):null; }catch(e){}
+        if(!r.ok){ var err=new Error('HTTP '+r.status); err.status=r.status; err.cuerpo=j||t; throw err; }
+        return j||{};
+      });
+    }, function(e){ clearTimeout(to); throw e; });
+  }
+  /* Un reintento solo ante fallos transitorios (red, 5xx). Un 4xx no se reintenta. */
+  function postConReintento(url, body, intento){
+    intento = intento || 0;
+    return post(url, body).catch(function(e){
+      var transitorio = !e.status || e.status >= 500;
+      if(transitorio && intento < REINTENTOS) return postConReintento(url, body, intento+1);
+      throw e;
+    });
+  }
+
+  /* ---------------- formato del texto (estilo WhatsApp) ----------------
+     Se escapa SIEMPRE primero (XSS) y recien despues se reponen negritas,
+     cursivas, tachado, vinetas y enlaces. */
+  function enLinea(l){
+    var h = esc(l);
+    h = h.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    h = h.replace(/(^|[^\w*])\*([^*\n]+)\*(?![\w*])/g, '$1<strong>$2</strong>');
+    h = h.replace(/(^|[^\w_])_([^_\n]+)_(?![\w_])/g, '$1<em>$2</em>');
+    h = h.replace(/(^|[^\w~])~([^~\n]+)~(?![\w~])/g, '$1<s>$2</s>');
+    return h;
+  }
+  function fmt(texto){
+    var s = String(texto==null?'':texto).replace(/\r\n?/g,'\n');
+    s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '$1: $2');   /* [txt](url) -> txt: url */
+    return s.split('\n').map(function(l){
+      if(!l.trim()) return '<span class="ln sep"></span>';
+      var m = /^\s*[-•*]\s+(.*)$/.exec(l);
+      if(m) return '<span class="ln li">• ' + enLinea(m[1]) + '</span>';
+      var n = /^\s*(\d{1,2})[.)]\s+(.*)$/.exec(l);
+      if(n) return '<span class="ln li">' + esc(n[1]) + '. ' + enLinea(n[2]) + '</span>';
+      return '<span class="ln">' + enLinea(l) + '</span>';
+    }).join('');
+  }
+
+  /* Enlaces clicables por DOM: `a.href` por propiedad y el texto por textContent;
+     la regex exige http(s): nada de `javascript:` ni `data:`. */
+  var RE_URL = /https?:\/\/[^\s<>"']+/g;
+  var CIERRES = '.,;:!?)]}»"\'';
+  function enlaza(root){
+    var textos = [], w, n;
+    try{ w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false); }catch(e){ return; }
+    while((n = w.nextNode())) if(n.nodeValue && n.nodeValue.indexOf('http') >= 0) textos.push(n);
+    textos.forEach(function(nodo){
+      var t = nodo.nodeValue, frag = document.createDocumentFragment(), i = 0, m, hubo = false;
+      RE_URL.lastIndex = 0;
+      while((m = RE_URL.exec(t)) !== null){
+        var url = m[0], cola = '';
+        while(url.length && CIERRES.indexOf(url.charAt(url.length-1)) >= 0){
+          cola = url.charAt(url.length-1) + cola;
+          url = url.slice(0,-1);
+        }
+        if(!url) continue;
+        if(m.index > i) frag.appendChild(document.createTextNode(t.slice(i, m.index)));
+        var a = document.createElement('a');
+        a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = url;
+        frag.appendChild(a);
+        i = m.index + m[0].length - cola.length;
+        hubo = true;
+      }
+      if(!hubo) return;
+      if(i < t.length) frag.appendChild(document.createTextNode(t.slice(i)));
+      nodo.parentNode.replaceChild(frag, nodo);
+    });
+  }
+
+  /* ---------------- lectura de lo que escribe la asistente ----------------
+     El simulador SOLO agrega cosas locales cuando el texto real de la asistente lo
+     justifica: la lamina cuando habla de los paquetes de Head Spa (primera vez),
+     el boton de validacion cuando dice que el abono esta en revision, el boton
+     "Ver que pasa despues" cuando dice que la cita quedo confirmada. */
+  var RE_PAQUETES = /(paquetes?\b[^.\n]{0,50}head spa|head spa[^.\n]{0,60}\bpaquetes?\b|head spa (vip|premium)|paquete (vip|premium)|tres paquetes)/;
+  var RE_REVISION = /((abono|constancia|pago|comprobante|yape)[^.\n]{0,90}(revision|revisando|validando|verificando|validar|verificar|valida|verifi))|(en|esta en|queda en) revision|(equipo|asesora)[^.\n]{0,40}(valida|verifi|revisa)|(avise|aviso|avisado)[^.\n]{0,20}equipo[^.\n]{0,40}abono/;
+  var RE_CONFIRMADA = /((cita|reserva)[^.\n?]{0,30}(quedo|esta|queda|ha quedado) (confirmad|agendad|reservad))|((confirmad[ao]|agendad[ao])[^.\n?]{0,20}tu (cita|reserva))|(tu (cita|reserva) (quedo|esta|queda) (confirmad|agendad))/;
+  var RE_BLOQUE = /confirmo tus datos/;
+  var RE_MARCA = /\[\s*(?:alerta|cierre|handoff|derivado|llamada|pase|contacto|asesor|marcador)[^\]]*\]/ig;
+  function quitaMarcas(texto){ return String(texto||'').replace(RE_MARCA,'').replace(/\n{3,}/g,'\n\n').trim(); }
+
+  function esDelAsistente(m){ return m.dir === 'out' && !m.img && !m.tpl && !m.auto && !m.sim && !m.sist; }
+  function ultimoDeAsistente(){
+    for(var i = st.msgs.length - 1; i >= 0; i--) if(esDelAsistente(st.msgs[i])) return st.msgs[i];
+    return null;
+  }
+  function ultimoDelCliente(){
+    for(var i = st.msgs.length - 1; i >= 0; i--) if(st.msgs[i].dir === 'in') return st.msgs[i];
+    return null;
+  }
+  function hayLamina(){ return st.msgs.some(function(m){ return !!m.img; }); }
+
+  /* indices en st.msgs */
+  function idxUltimo(fn){ for(var i = st.msgs.length - 1; i >= 0; i--) if(fn(st.msgs[i])) return i; return -1; }
+  function idxBloque(){ return idxUltimo(function(m){ return esDelAsistente(m) && RE_BLOQUE.test(norm(m.texto)); }); }
+
+  /* El boton de validacion aparece cuando la clienta ya avisó del abono (despues del bloque
+     de confirmacion) y la asistente dijo que esta en revision. */
+  function puedeValidar(){
+    if(st.validado) return false;
+    var b = idxBloque();
+    if(b < 0) return false;
+    var cl = idxUltimo(function(m){ return m.dir === 'in'; });
+    if(cl < b) return false;
+    var a = idxUltimo(esDelAsistente);
+    if(a < cl) return false;
+    return RE_REVISION.test(norm(st.msgs[a].texto));
+  }
+  function puedeDespues(){
+    if(st.despues) return false;
+    return st.msgs.some(function(m){
+      return m.dir === 'out' && !m.img && !m.tpl && !m.auto && !RE_BLOQUE.test(norm(m.texto)) && RE_CONFIRMADA.test(norm(m.texto));
+    });
+  }
+
+  /* datos de la cita, leidos del bloque «Confirmo tus datos» */
+  function datosCita(){
+    var out = { servicio:'', fecha:'', hora:'' };
+    var b = idxBloque();
+    if(b >= 0){
+      String(st.msgs[b].texto).split('\n').forEach(function(l){
+        var m = /^\s*(?:[-•*]\s*)?\**\s*([^:\n*]{2,24}?)\s*\**\s*:\s*\**\s*(.+?)\s*$/.exec(l);
+        if(!m) return;
+        var k = norm(m[1]).trim(), v = m[2].replace(/\*+/g,'').trim();
+        if(/^servicio/.test(k)) out.servicio = v;
+        else if(/^(fecha|dia|dia y hora|fecha y hora|horario)/.test(k)) out.fecha = v;
+      });
+    }
+    var h = /(\d{1,2}(?::\d{2})?\s*(?:a\.?\s?m\.?|p\.?\s?m\.?))/i.exec(out.fecha);
+    if(h) out.hora = h[1].replace(/\s+/g,' ').toLowerCase().replace(/([ap])\.?\s?m\.?/, function(_,l){ return l + '. m.'; });
+    return out;
+  }
+
+  /* ---------------- render del hilo ---------------- */
+  var TICKS_LEIDO = '<svg class="ticks" width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-label="Leído"><path d="M1 5.9l2.5 2.6L8.7 3"/><path d="M6.3 8.5L11.5 3"/></svg>';
+  var TICKS_ENVIADO = '<svg class="ticks gris" width="12" height="11" viewBox="0 0 12 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-label="Enviado"><path d="M1 5.9l2.5 2.6L9.5 2.4"/></svg>';
+
+  /* Safari/iOS no baja el hilo si el layout aun no se actualizo: rAF de red. */
+  function abajo(){
+    var h = $('hilo');
+    h.scrollTop = h.scrollHeight;
+    if(typeof requestAnimationFrame === 'function'){
+      requestAnimationFrame(function(){ h.scrollTop = h.scrollHeight; });
+    }
+  }
+
+  function htmlAd(ad){
+    return '<span class="ad"><img src="assets/head-spa-paquetes.jpg" width="937" height="1172" alt="" onerror="this.style.display=\'none\'">'
+      + '<span class="ad-t"><b>' + esc(ad.t) + '</b><span>' + esc(ad.s) + '</span></span></span>';
+  }
+  function htmlConstancia(){
+    return '<span class="const" role="img" aria-label="Constancia de pago de ejemplo"><i class="g"></i><i></i><i></i><i class="s"></i><em>Constancia de ejemplo</em></span>';
+  }
+
+  function pinta(alTope){
+    var h = $('hilo');
+    var esc_ = ESCENARIOS[st.esc];
+    var html = '<span class="demo-nota">' + esc(esc_.nota) + '</span>';
+    if(MOCK) html += '<span class="demo-nota mockn">Modo de prueba local: las respuestas son un guion, no de la asistente real.</span>';
+    html += '<span class="dia">' + esc(diaLargo(new Date())) + '</span>';
+
+    st.msgs.forEach(function(m){
+      var nv = m._v ? '' : ' nuevo'; m._v = true;
+      if(m.dir === 'sis'){
+        html += '<div class="sis' + (m.err ? ' err' : '') + (m.hora ? ' corto-tiempo' : '') + '" role="' + (m.err ? 'alert' : 'status') + '">' + esc(m.texto)
+              + (m.reintentar ? '<button type="button" data-reintentar="' + esc(m.id) + '">Reintentar</button>' : '') + '</div>';
+        return;
+      }
+      var mio = m.dir === 'in';
+      var et = m.tsLabel || hora(m.ts);
+      if(m.tpl){
+        html += '<div class="msg del-neg tpl' + nv + '"><span class="tpl-hd"><span class="t1">Ya abrimos en San Isidro</span><span class="t2">StetikGo</span></span>'
+              + '<span class="txt">' + fmt(m.texto) + '</span>'
+              + '<span class="tag-auto">Mensaje de campaña con plantilla aprobada: lo envía el módulo de Campañas, no la asistente.</span>'
+              + '<span class="pie">' + esc(et) + '</span></div>'
+              + '<div class="tpl-btns"><button type="button" data-btn="reservar"' + (st.enVuelo ? ' disabled' : '') + '>Reservar</button>'
+              + '<button type="button" data-btn="baja"' + (st.baja ? ' disabled' : '') + '>No recibir promos</button></div>';
+        return;
+      }
+      if(m.img){
+        html += '<div class="msg del-neg lamina' + nv + '"><a href="' + esc(m.img) + '" target="_blank" rel="noopener"><img src="' + esc(m.img) + '" width="937" height="1172" alt="Lámina de los paquetes de Head Spa"></a>'
+              + '<span class="pie">' + esc(et) + '</span></div>'
+              + '<span class="lamina-nota">Lámina de referencia; los precios vigentes van en el mensaje.</span>';
+        return;
+      }
+      if(m.sist){
+        html += '<div class="msg del-neg sistema' + nv + '"><span class="insignia">Automático</span><span class="txt">' + fmt(m.texto) + '</span>'
+              + (m.falso ? '<span class="falso">' + esc(m.falso) + '</span>' : '')
+              + '<span class="tag-auto">' + esc(m.tag || '') + '</span>'
+              + '<span class="pie">' + esc(et) + '</span></div>';
+        return;
+      }
+      if(m.sim){
+        html += '<div class="msg del-neg' + nv + '"><span class="txt">' + fmt(m.texto) + '</span>'
+              + '<span class="tag-auto">' + esc(m.tag || '') + '</span>'
+              + '<span class="pie">' + esc(et) + '</span></div>';
+        return;
+      }
+      html += '<div class="msg ' + (mio?'del-cliente':'del-neg') + nv + '">'
+            + (m.ad ? htmlAd(m.ad) : '')
+            + (m.adj ? htmlConstancia() : '')
+            + '<span class="txt">' + fmt(m.texto) + '</span>'
+            + '<span class="pie">' + esc(et) + (mio?(m.leido?TICKS_LEIDO:TICKS_ENVIADO):'') + '</span>'
+            + '</div>';
+    });
+
+    if(puedeValidar()){
+      html += '<div class="sis accion" role="status"><b>El equipo valida el abono con 1 clic</b>En la demo, ese clic lo simulas tú.'
+            + '<button type="button" data-validar="1">Simular validación del equipo</button></div>';
+    }
+    if(puedeDespues()){
+      html += '<div class="sis accion ok" role="status"><b>La cita quedó confirmada</b>El sistema sigue solo: recordatorio y pedido de reseña.'
+            + '<button type="button" data-despues="1">Ver qué pasa después</button></div>';
+    }
+    if(st.esperando) html += '<div class="typing" aria-label="escribiendo"><i></i><i></i><i></i></div>';
+
+    h.innerHTML = html;
+    var txts = h.querySelectorAll('.msg .txt');
+    for(var i=0;i<txts.length;i++) enlaza(txts[i]);
+    if(alTope){
+      h.scrollTop = 0;
+      if(typeof requestAnimationFrame === 'function') requestAnimationFrame(function(){ h.scrollTop = 0; });
+    }else{
+      abajo();
+    }
+    pintaEstadoCRM();
+    pintaTurnos();
+    pintaConstancia();
+    guarda();
+  }
+
+  /* Estado en el CRM, con las mismas etapas del tablero (Esperando abono / Abono por validar / Cita confirmada) */
+  function pintaEstadoCRM(){
+    var e = $('estado-crm'), titulo, desc, hecho = true;
+    var b = idxBloque();
+    var cl = idxUltimo(function(m){ return m.dir === 'in'; });
+    var avisoAbono = b >= 0 && st.msgs.some(function(m, i){ return i > b && m.dir === 'in'; });
+    var llamar = (st.esc === 'hoy') ? ' Con la etiqueta «Llamar hoy», porque pidió cita para hoy.' : '';
+    if(st.validado || puedeDespues() || st.despues){
+      titulo = 'En el CRM: Cita confirmada'; desc = 'El abono está validado y la cita quedó en la agenda del equipo.' + llamar;
+    }else if(avisoAbono){
+      titulo = 'En el CRM: Esperando abono, por validar'; desc = 'La clienta avisó que abonó; el equipo ve la píldora «Abono por validar».' + llamar;
+    }else if(b >= 0){
+      titulo = 'En el CRM: Esperando abono'; desc = 'La reserva quedó anotada con sus datos; falta el abono de S/ 10.' + llamar;
+    }else if(st.baja){
+      titulo = 'En el CRM: No recibir promos'; desc = 'La clienta quedó marcada y no vuelve a entrar en campañas.';
+    }else{
+      titulo = 'En el CRM: sin reserva todavía'; desc = 'La clienta aparece cuando deja sus datos para reservar.'; hecho = false;
+    }
+    e.className = 'estado-crm' + (hecho ? ' hecho' : '');
+    e.innerHTML = '<b>' + esc(titulo) + '</b>' + esc(desc);
+  }
+  function nTurnos(){ return st.msgs.filter(function(m){ return m.dir === 'in' && !m.sinChat; }).length; }
+  function pintaTurnos(){ $('turnos').textContent = nTurnos() + ' de ' + MAX_TURNOS; }
+  /* la constancia se sugiere (pulso) cuando la asistente ya pidio el abono */
+  function pintaConstancia(){
+    var btn = $('btn-const');
+    btn.disabled = st.enVuelo;
+    var a = ultimoDeAsistente();
+    var b = idxBloque();
+    var yaAviso = b >= 0 && st.msgs.some(function(m, i){ return i > b && m.dir === 'in'; });
+    btn.className = 'btn-const' + ((a && b >= 0 && !yaAviso && !st.enVuelo && /(constancia|yape|plin|abon)/.test(norm(a.texto))) ? ' sugerido' : '');
+  }
+
+  /* ---------------- conversacion ---------------- */
+  function abreHilo(){
+    st.msgs = [];
+    st.mock = { paso:'inicio', datos:{}, fallos:0 };
+    st.lleno = false; st.validado = false; st.despues = false; st.baja = false;
+    if(ESCENARIOS[st.esc].plantilla){
+      var antes = new Date(Date.now() - 55*60*1000);
+      st.msgs.push({ id:'tpl-1', dir:'out', tpl:true, texto:TXT_PLANTILLA, ts:antes.toISOString(), tsLabel:hora(antes) });
+    }
+    pinta(true);
+  }
+
+  function nuevaConversacion(foco){
+    st.sesion = nuevaSesion();
+    st.enVuelo = false; st.esperando = false;
+    $('btn-enviar').disabled = false;
+    $('hd-estado').textContent = 'cuenta de empresa';
+    abreHilo();
+    pintaSelector();
+    pintaRapidos();
+    $('in-sesion').value = st.sesion;
+    $('in-msg').value = '';
+    ajusta();
+    if(foco) $('in-msg').focus();
+  }
+
+  /* ---------------- guion local (?mock=1) ----------------
+     Solo para ensayar el diseno y el flujo SIN gastar IA. Precios: solo los de la
+     WeiBook (Head Spa 250 / VIP 380 / Premium 500, vigentes al 2-nov-2026); la lamina
+     de feb-2025 (249/379/499) solo se muestra como imagen. Abono S/ 10 al 999 999 999 (numero ficticio). */
+    var LISTA_PAQUETES = '- Head Spa: S/ 250 (aprox. 1 h 30)\n- Head Spa VIP: S/ 380 (aprox. 2 h)\n- Head Spa Premium: S/ 500 (aprox. 3 h)';
+  function pickServicio(texto){
+    var t = norm(texto);
+    if(/premium/.test(t)) return 'Head Spa Premium';
+    if(/\bvip\b/.test(t)) return 'Head Spa VIP';
+    if(/head spa|spa|pedicure/.test(t)) return 'Head Spa';
+    return capitaliza(String(texto).replace(/^(quiero|quisiera|me gustaria|reservar|un|una)\s+/i,'').trim()) || 'Head Spa';
+  }
+  function pickFranja(texto, hoy){
+    var t = norm(texto), h = '';
+    if(/\b(11|once)\b/.test(t)) h = '11:00 a. m.';
+    else if(/\b(3|tres|15)\b/.test(t)) h = '3:00 p. m.';
+    else if(/\b(6|seis|18)\b/.test(t)) h = '6:00 p. m.';
+    var dia = /\bhoy\b/.test(t) ? 'Hoy' : (/sabado/.test(t) ? 'Sábado' : (/viernes/.test(t) ? 'Viernes' : ((/\bmanana\b/.test(t) && !/(de|en|por) la manana/.test(t)) ? 'Mañana' : (hoy ? 'Hoy' : 'Mañana'))));
+    return h ? dia + ', ' + h : capitaliza(String(texto).trim());
+  }
+  function mockRespuesta(texto){
+    var m = st.mock, d = m.datos, p = m.paso, t = norm(texto), r = '';
+    var nombre = d.nombre ? d.nombre.split(' ')[0] : '';
+    if(p === 'inicio'){
+      if(st.esc === 'otro'){
+        d.servicio = 'Manicure';
+        r = '¡Hola! Soy la asistente virtual (IA) de StetikGo ✨\n\nSí, tenemos ' + OTRO_SERVICIO + ':\n- Manicure Clásica: S/ 30 (30 min)\n- Manicure Color Gel: S/ 60 (50 min)\n\nSi quieres, te reservo una cita: se separa con un abono de S/ 10 que se descuenta del total. ¿Te animas?';
+        m.paso = 'acepta';
+      }else if(st.esc === 'campana'){
+        r = '¡Hola! Qué bueno que quieras reservar, ya estamos en San Isidro ✨\n\n¿Qué servicio te gustaría?';
+        m.paso = 'paquete';
+      }else if(st.esc === 'hoy'){
+        d.hoy = true;
+        r = '¡Hola! Soy la asistente virtual (IA) de StetikGo. Para hoy en la tarde el equipo confirma el cupo exacto, así que dejo tu reserva lista para que te avisen de inmediato.\n\n¿Qué servicio te gustaría?';
+        m.paso = 'paquete';
+      }else{
+        r = '¡Hola! Soy la asistente virtual (IA) de StetikGo ✨ Gracias por escribirnos.\n\nEl Head Spa es un momento de relajación con lavado y masaje capilar, facial, aromaterapia y música relajante. Tenemos tres paquetes:\n' + LISTA_PAQUETES + '\n\n¿Qué paquete te gustaría?';
+        m.paso = 'paquete';
+      }
+    }else if(p === 'acepta'){
+      r = 'Perfecto. ¿Cuál es tu nombre y apellido?';
+      m.paso = 'nombre';
+    }else if(p === 'paquete'){
+      d.servicio = pickServicio(texto);
+      if(/\bincluye|que trae|premium.*\?|\?.*premium/.test(t) && !/quiero el/.test(t)){
+        r = 'El Head Spa Premium (aprox. 3 h) incluye lavado, masaje y tratamiento capilar, vaporización, cepillado u ondas, facial hidratante, masaje facial y cervical, aromaterapia, música relajante, manicure brasilera, pedicure jelly spa, esmaltado color gel, maderoterapia, y drinks y piqueo de cortesía.\n\n¿Quieres reservar ese paquete?';
+        d.servicio = 'Head Spa Premium'; m.paso = 'acepta';
+      }else{
+        r = 'Excelente elección: ' + d.servicio + '.\n\n¿Cuál es tu nombre y apellido?';
+        m.paso = 'nombre';
+      }
+    }else if(p === 'nombre'){
+      d.nombre = texto.replace(/^(mi nombre es|me llamo|soy)\s+/i,'').trim();
+      nombre = d.nombre.split(' ')[0];
+      r = 'Mucho gusto, ' + nombre + '. ' + (d.hoy
+        ? 'Para hoy tengo estos horarios por confirmar: 3:00 p. m. o 6:00 p. m.'
+        : 'Tengo estos dos horarios: mañana a las 11:00 a. m. o a las 6:00 p. m.') + '\n\n¿Cuál te acomoda?';
+      m.paso = 'franja';
+    }else if(p === 'franja'){
+      d.fecha = pickFranja(texto, d.hoy);
+      r = '¿A qué número de celular te confirmamos? Escríbelo con los 9 dígitos.';
+      m.paso = 'telefono';
+    }else if(p === 'telefono'){
+      d.tel = /mismo|este|whatsapp/.test(t) ? 'El mismo de este WhatsApp' : (texto.replace(/[^\d ]/g,'').trim() || texto.trim());
+      r = 'Confirmo tus datos:'
+        + '\n- Servicio: ' + (d.servicio || 'Head Spa')
+        + '\n- Nombre: ' + d.nombre
+        + '\n- Fecha: ' + (d.fecha || 'Mañana, 6:00 p. m.')
+        + '\n- Teléfono: ' + d.tel
+        + '\n\nPara reservar tu cita, abona S/ 10 por Yape o Plin al 999 999 999 (número de demostración). Ese abono se descuenta del total el día de tu cita. Cuando lo hagas, envíame la constancia.';
+      m.paso = 'abono';
+    }else if(p === 'abono'){
+      if(/yape|constancia|abon|pague|listo|transfer/.test(t)){
+        r = 'Gracias, ' + (nombre || 'ya') + ': recibí tu constancia. Tu abono está en revisión; el equipo lo valida y te confirmo por aquí.';
+        m.paso = 'revision';
+      }else{
+        r = 'Cuando hayas abonado S/ 10 al 999 999 999 (número de demostración), envíame la constancia y dejo tu cita en revisión.';
+      }
+    }else if(p === 'revision'){
+      r = 'Tu abono sigue en revisión. En cuanto el equipo lo valide, te confirmo por aquí.';
+    }else{
+      r = 'Tu cita ya está confirmada. Si tienes algún cambio, avísanos con anticipación.';
+    }
+    return r;
+  }
+
+  /* `reenvio`: reintento tras un error; no vuelve a pintar la burbuja de la clienta.
+     `extra`: campos que se mezclan en la burbuja de la clienta (p. ej. la constancia). */
+  function enviar(texto, reenvio, extra){
+    texto = String(texto||'').trim();
+    if(!texto || st.enVuelo) return;
+
+    var sesion = st.sesion;
+    var mio;
+    if(!reenvio && nTurnos() >= MAX_TURNOS){
+      st.lleno = true;
+      var ult = st.msgs[st.msgs.length - 1];
+      if(!(ult && ult.dir === 'sis' && ult.limite)) st.msgs.push({ id:'s-'+Date.now(), dir:'sis', limite:true, texto:'Llegaste al máximo de mensajes de esta conversación de prueba. Usa Reiniciar chat para empezar otra.' });
+      pinta();
+      return;
+    }
+    var primerMensaje = !reenvio && !st.msgs.some(function(m){ return m.dir === 'in'; });
+    if(reenvio){ mio = ultimoDelCliente(); }
+    else{
+      mio = { id:'local-'+Date.now(), dir:'in', texto:texto, ts:new Date().toISOString(), leido:false };
+      if(primerMensaje && ESCENARIOS[st.esc].ad) mio.ad = ESCENARIOS[st.esc].ad;
+      if(extra) for(var k in extra) mio[k] = extra[k];
+      st.msgs.push(mio);
+    }
+
+    st.enVuelo = true; st.esperando = true;
+    $('btn-enviar').disabled = true;
+    $('hd-estado').textContent = 'escribiendo…';
+    pinta();
+
+    var llamada;
+    if(MOCK){
+      var textoMock = mockRespuesta(texto);
+      llamada = new Promise(function(res){ setTimeout(function(){ res({ output:textoMock }); }, 700 + Math.random()*500); });
+    }else{
+      llamada = postConReintento(EP_CHAT, { message: texto, sessionId: sesion, channel: 'web', origin: location.origin });
+    }
+
+    llamada
+      .then(function(r){ return { r:r }; }, function(e){ return { e:e }; })
+      .then(function(a){
+        if(st.sesion !== sesion) return;
+        if(mio) mio.leido = true;
+        if(a.e){
+          st.msgs.push({ id:'s-'+Date.now(), dir:'sis', err:true, reintentar:true, texto: mensajeError(a.e), reintento:texto });
+          return;
+        }
+        var reply = a.r && (a.r.output || a.r.response || a.r.text);
+        if(reply && String(reply).trim()){
+          reply = String(reply);
+          var visible = quitaMarcas(reply) || reply;
+          st.msgs.push({ id:'r-'+Date.now(), dir:'out', texto:visible, ts:new Date().toISOString() });
+          /* la lamina la agrega el simulador, solo cuando la asistente habla de los paquetes por primera vez */
+          if(!hayLamina() && RE_PAQUETES.test(norm(visible))){
+            st.msgs.push({ id:'img-'+Date.now(), dir:'out', img:IMG_LAMINA, ts:new Date().toISOString() });
+          }
+        }else{
+          st.msgs.push({ id:'s-'+Date.now(), dir:'sis', err:true, reintentar:true, texto:'La asistente respondió vacío.', reintento:texto });
+        }
+      }).then(function(){
+        if(st.sesion !== sesion) return;
+        st.enVuelo = false; st.esperando = false;
+        $('btn-enviar').disabled = false;
+        $('hd-estado').textContent = 'cuenta de empresa';
+        pinta();
+      });
+  }
+
+  function mensajeError(e){
+    if(e && e.status === 404) return 'La asistente todavía no está conectada en este servidor. Reintenta en unos minutos.';
+    if(e && e.status === 413) return 'Tu mensaje es muy largo. Envíalo en partes más cortas.';
+    if(e && e.status === 429) return 'Demasiados mensajes seguidos. Espera un momento y reintenta.';
+    if(e && e.name === 'AbortError') return 'La asistente tardó más de lo normal en responder.';
+    if(e && e.status) return 'La asistente no pudo responder (error ' + e.status + ').';
+    return 'No hay conexión con la asistente.';
+  }
+
+  /* ---------------- acciones locales del simulador ---------------- */
+  /* Baja de promos: la responde el SISTEMA, jamas el chat. */
+  function darDeBaja(){
+    if(st.baja) return;
+    var ahora = new Date().toISOString();
+    st.msgs.push({ id:'baja-in-'+Date.now(), dir:'in', sinChat:true, texto:'No recibir promos', ts:ahora, leido:true });
+    st.msgs.push({ id:'baja-out-'+Date.now(), dir:'out', sim:true, texto:TXT_BAJA, ts:ahora,
+      tag:'Respuesta automática del sistema de envíos: no llama a la asistente.' });
+    st.msgs.push({ id:'baja-sis-'+Date.now(), dir:'sis', texto:'En el CRM la clienta queda marcada como «No recibir promos» y no vuelve a entrar en campañas.' });
+    st.baja = true;
+    pinta();
+  }
+  function simularValidacion(){
+    if(st.validado) return;
+    var d = datosCita();
+    var lineas = '¡Abono recibido! Tu cita quedó confirmada ✅';
+    if(d.servicio) lineas += '\n- Servicio: ' + d.servicio;
+    if(d.fecha) lineas += '\n- Fecha: ' + d.fecha;
+    lineas += '\n\nTe esperamos en Calle Los Sauces 203, San Isidro. La noche antes te enviamos un recordatorio por aquí.';
+    st.msgs.push({ id:'val-'+Date.now(), dir:'out', sim:true, texto:lineas, ts:new Date().toISOString(),
+      tag:'Se envía cuando el equipo valida el abono (simulado en la demo).' });
+    st.validado = true;
+    pinta();
+  }
+  function verDespues(){
+    if(st.despues) return;
+    var d = datosCita();
+    var manana = /^hoy/i.test(d.fecha) ? 'de hoy' : 'de mañana';
+    var rec = 'Hola 💛 te recordamos tu cita ' + manana + (d.hora ? ' a las ' + d.hora : '') + (d.servicio ? ' (' + d.servicio + ')' : '') + ' en StetikGo. Si tienes algún cambio, avísanos con anticipación. ¡Te esperamos!';
+    var rev = 'Gracias por visitarnos 💛 ¿Cómo te fue? Tu opinión nos ayuda mucho: déjanos tu reseña en Google.';
+    var ts = new Date().toISOString();
+    st.msgs.push({ id:'d1-'+Date.now(), dir:'sis', hora:true, texto:'La noche antes de la cita' });
+    st.msgs.push({ id:'d2-'+Date.now(), dir:'out', sist:true, texto:rec, ts:ts, tag:'Recordatorio automático: lo envía el sistema, no la asistente.' });
+    st.msgs.push({ id:'d3-'+Date.now(), dir:'sis', hora:true, texto:'Después de la cita' });
+    st.msgs.push({ id:'d4-'+Date.now(), dir:'out', sist:true, texto:rev, falso:'Enlace de reseña en Google (ejemplo)', ts:ts, tag:'Pedido de reseña automático: en la demo no lleva ningún enlace real.' });
+    st.despues = true;
+    pinta();
+  }
+
+  /* ---------------- interfaz ---------------- */
+  function ajusta(){
+    var t = $('in-msg'); t.style.height = 'auto';
+    t.style.height = Math.min(t.scrollHeight, 100) + 'px';
+    t.style.overflowY = t.scrollHeight > 100 ? 'auto' : 'hidden';
+  }
+  function pintaSelector(){
+    var btns = document.querySelectorAll('.chip[data-esc]');
+    for(var i=0;i<btns.length;i++) btns[i].setAttribute('aria-pressed', btns[i].getAttribute('data-esc') === st.esc ? 'true' : 'false');
+    $('sel-info').textContent = ESCENARIOS[st.esc].info;
+    $('st-hora').textContent = hora(new Date());
+  }
+  function pintaRapidos(){
+    ['rapidos-d','rapidos-m'].forEach(function(cont){
+      var caja = $(cont); if(!caja) return;
+      caja.innerHTML = '';
+      ESCENARIOS[st.esc].rapidos.forEach(function(txt){
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'rapido' + (cont === 'rapidos-m' ? ' rapido-m' : ''); b.textContent = txt;
+        b.addEventListener('click', function(){ $('in-msg').value = txt; $('in-msg').focus(); ajusta(); });
+        caja.appendChild(b);
+      });
+    });
+  }
+  /* El boton de escenario empieza una conversacion nueva y envia el primer mensaje literal.
+     Antirrebote: un doble toque no gasta dos turnos reales. */
+  var ultimoChip = 0;
+  function iniciaEscenario(e){
+    var ahora = Date.now();
+    if(ahora - ultimoChip < 1500) return;
+    ultimoChip = ahora;
+    st.esc = e;
+    nuevaConversacion(false);
+    enviar(ESCENARIOS[e].primero);
+  }
+
+  function init(){
+    if(!st.msgs.length) abreHilo(); else pinta(false);
+    $('in-sesion').value = st.sesion;
+    pintaSelector();
+    pintaRapidos();
+
+    var chips = document.querySelectorAll('.chip[data-esc]');
+    for(var i=0;i<chips.length;i++){
+      (function(b){ b.addEventListener('click', function(){ iniciaEscenario(b.getAttribute('data-esc')); }); })(chips[i]);
+    }
+
+    $('hilo').addEventListener('click', function(ev){
+      var t = ev.target;
+      if(!t.closest) return;
+      var bt = t.closest('button[data-btn]');
+      if(bt){
+        var which = bt.getAttribute('data-btn');
+        if(which === 'reservar') enviar('Reservar');
+        else if(which === 'baja') darDeBaja();
+        return;
+      }
+      if(t.closest('button[data-validar]')){ simularValidacion(); return; }
+      if(t.closest('button[data-despues]')){ verDespues(); return; }
+      var r = t.closest('button[data-reintentar]');
+      if(r && !st.enVuelo){
+        var id = r.getAttribute('data-reintentar'), texto = '';
+        st.msgs = st.msgs.filter(function(m){ if(m.id === id){ texto = m.reintento || ''; return false; } return true; });
+        enviar(texto, true);
+      }
+    });
+
+    $('btn-const').addEventListener('click', function(){ enviar(TXT_CONSTANCIA, false, { adj:true }); });
+
+    $('form').addEventListener('submit', function(ev){
+      ev.preventDefault();
+      var t = $('in-msg').value;
+      $('in-msg').value = ''; ajusta();
+      enviar(t);
+    });
+    $('in-msg').addEventListener('input', ajusta);
+    $('in-msg').addEventListener('keydown', function(ev){
+      if(ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); $('form').requestSubmit(); }
+    });
+    $('btn-reiniciar').addEventListener('click', function(){ nuevaConversacion(true); });
+    $('btn-reiniciar-top').addEventListener('click', function(){ nuevaConversacion(true); });
+
+    var av = $('hd-av');
+    av.addEventListener('error', function(){ av.style.display = 'none'; });
+    if(av.complete && av.naturalWidth === 0) av.style.display = 'none';
+
+    /* el reloj de la barra de estado solo existe en escritorio */
+    var reloj = function(){ $('st-hora').textContent = hora(new Date()); };
+    reloj();
+    var timer = setInterval(reloj, 20000);
+    window.addEventListener('pagehide', function(){ clearInterval(timer); });
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+</body>
+</html>
